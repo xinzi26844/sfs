@@ -1,0 +1,72 @@
+<!DOCTYPE html> 
+<html lang="zh-CN"> 
+<head> 
+<meta charset="UTF-8"> 
+<meta name="viewport" content="width=device-width, initial-scale=1.0"> 
+<title>用户登录</title> 
+<style>
+/* 您提供的CSS样式保持不变 */
+</style>
+</head> 
+<body> 
+<div class="login-container"> 
+<h2>用户登录</h2> 
+<form id="loginForm">
+    <div class="form-group"> 
+        <label for="username">用户名/邮箱</label> 
+        <input type="text" id="username" name="username" required> 
+    </div> 
+    <div class="form-group"> 
+        <label for="password">密码</label> 
+        <input type="password" id="password" name="password" required minlength="6"> 
+    </div> 
+    <button type="submit">登录</button> 
+</form> 
+<div class="links"> 
+    没有账号？立即注册 
+</div> 
+<div id="message" style="margin-top: 1rem; text-align: center; color: red;"></div>
+</div> 
+
+<script>
+document.getElementById('loginForm').addEventListener('submit', async function(e) {
+    e.preventDefault();
+    
+    const username = document.getElementById('username').value;
+    const password = document.getElementById('password').value;
+    const messageEl = document.getElementById('message');
+    
+    try {
+        const response = await fetch('/api/login', {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json'
+            },
+            body: JSON.stringify({
+                username: username,
+                password: password
+            })
+        });
+        
+        const data = await response.json();
+        
+        if (data.success) {
+            messageEl.textContent = '登录成功！正在跳转...';
+            messageEl.style.color = 'green';
+            // 跳转到用户仪表盘或首页
+            setTimeout(() => {
+                window.location.href = '/dashboard';
+            }, 1000);
+        } else {
+            messageEl.textContent = data.message || '登录失败';
+            messageEl.style.color = 'red';
+        }
+    } catch (error) {
+        messageEl.textContent = '网络错误，请稍后重试';
+        messageEl.style.color = 'red';
+        console.error('登录错误:', error);
+    }
+});
+</script>
+</body> 
+</html>
