@@ -1,0 +1,308 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>同济大学3D城市可视化</title>
+    <script src="https://cdn.jsdelivr.net/npm/three@0.132.2/build/three.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/three@0.132.2/examples/js/controls/OrbitControls.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/three@0.132.2/examples/js/loaders/GLTFLoader.js"></script>
+    <style>
+        body { margin: 0; padding: 0; overflow: hidden; }
+        canvas { display: block; }
+        .info {
+            position: absolute;
+            top: 10px;
+            left: 10px;
+            width: 300px;
+            background: rgba(255, 255, 255, 0.8);
+            padding: 10px;
+            border-radius: 5px;
+            font-family: Arial, sans-serif;
+            z-index: 100;
+        }
+        .controls {
+            position: absolute;
+            bottom: 10px;
+            left: 10px;
+            background: rgba(255, 255, 255, 0.8);
+            padding: 10px;
+            border-radius: 5px;
+            font-family: Arial, sans-serif;
+            z-index: 100;
+        }
+        button {
+            margin: 5px;
+            padding: 8px 12px;
+            background: #4CAF50;
+            color: white;
+            border: none;
+            border-radius: 4px;
+            cursor: pointer;
+        }
+        button:hover {
+            background: #45a049;
+        }
+        .building-info {
+            position: absolute;
+            top: 10px;
+            right: 10px;
+            width: 250px;
+            background: rgba(255, 255, 255, 0.8);
+            padding: 10px;
+            border-radius: 5px;
+            font-family: Arial, sans-serif;
+            display: none;
+            z-index: 100;
+        }
+        label {
+            margin-right: 10px;
+        }
+    </style>
+</head>
+<body>
+    <div class="info">
+        <h2>同济大学3D城市可视化</h2>
+        <p>这是一个使用Three.js的同济大学建筑模型</p>
+        <p>操作方式：</p>
+        <p>• 鼠标左键：旋转视角</p>
+        <p>• 鼠标右键：平移视角</p>
+        <p>• 鼠标滚轮：缩放</p>
+        <p>• 点击建筑物：查看信息</p>
+    </div>
+
+    <div class="controls">
+        <button id="viewCampus">同济大学视角</button>
+        <button id="nightMode">切换夜景模式</button>
+    </div>
+
+    <div class="building-info" id="buildingInfo">
+        <h3>建筑信息</h3>
+        <p id="buildingName"></p>
+        <p id="buildingHeight"></p>
+        <p id="buildingFunction"></p>
+        <button id="closeInfo">关闭</button>
+    </div>
+
+    <script>
+        // 创建场景、相机和渲染器
+        const scene = new THREE.Scene();
+        scene.background = new THREE.Color(0x87CEEB); // 天蓝色背景
+        
+        const camera = new THREE.PerspectiveCamera(60, window.innerWidth / window.innerHeight, 0.1, 2000);
+        camera.position.set(100, 100, 100);
+        camera.lookAt(0, 0, 0);
+        
+        const renderer = new THREE.WebGLRenderer({ antialias: true });
+        renderer.setSize(window.innerWidth, window.innerHeight);
+        renderer.shadowMap.enabled = true;
+        renderer.shadowMap.type = THREE.PCFSoftShadowMap;
+        document.body.appendChild(renderer.domElement);
+        
+        // 添加轨道控制
+        const controls = new THREE.OrbitControls(camera, renderer.domElement);
+        controls.enableDamping = true;
+        controls.dampingFactor = 0.05;
+        controls.maxPolarAngle = Math.PI / 2 - 0.1; // 限制俯角，不能穿过地面
+        
+        // 添加光源
+        const ambientLight = new THREE.AmbientLight(0xffffff, 0.5);
+        scene.add(ambientLight);
+        
+        const directionalLight = new THREE.DirectionalLight(0xffffff, 0.8);
+        directionalLight.position.set(150, 200, 50);
+        directionalLight.castShadow = true;
+        scene.add(directionalLight);
+        
+        // 创建地面（水面和陆地）
+        const groundGeometry = new THREE.PlaneGeometry(500, 500, 50, 50);
+        const groundMaterial = new THREE.MeshStandardMaterial({ 
+            color: 0x1E824C, 
+            side: THREE.DoubleSide,
+            roughness: 0.8,
+            metalness: 0.2
+        });
+        const ground = new THREE.Mesh(groundGeometry, groundMaterial);
+        ground.rotation.x = -Math.PI / 2;
+        ground.receiveShadow = true;
+        scene.add(ground);
+        
+        // 创建建筑物集合
+        const buildingsGroup = new THREE.Group();
+        scene.add(buildingsGroup);
+        
+        // 存储建筑信息的数组，用于点击显示
+        const buildingsData = [];
+        
+        // 创建建筑物函数
+        function createBuilding(x, z, width, depth, height, color, name, func) {
+            const geometry = new THREE.BoxGeometry(width, height, depth);
+            const material = new THREE.MeshStandardMaterial({ 
+                color: color,
+                roughness: 0.7,
+                metalness: 0.2
+            });
+            const building = new THREE.Mesh(geometry, material);
+            building.position.set(x, height / 2, z);
+            building.castShadow = true;
+            building.receiveShadow = true;
+            
+            // 存储建筑信息
+            buildingsData.push({
+                mesh: building,
+                name: name || "未命名建筑",
+                height: height,
+                function: func || "教学/宿舍用途"
+            });
+            
+            return building;
+        }
+
+        // 创建图书馆
+        function createLibrary() {
+            const library = createBuilding(
+                0, 50, 60, 40, 80, 0x4682B4, "图书馆", "教学/学习"
+            );
+            library.name = "图书馆";
+            buildingsGroup.add(library);
+        }
+
+        // 创建同济大学建筑
+        function createCampus() {
+            // 南楼（矮胖型）
+            const southBuilding = createBuilding(
+                -60, 0, 25, 30, 40, 0xA9A9A9, "南楼", "教学楼"
+            );
+            buildingsGroup.add(southBuilding);
+            
+            // 北楼（相对更高）
+            const northBuilding = createBuilding(
+                -20, 0, 20, 20, 80, 0xD3D3D3, "北楼", "教学楼"
+            );
+            buildingsGroup.add(northBuilding);
+
+            // 食堂
+            const canteen = createBuilding(
+                20, 30, 30, 20, 10, 0xFF6347, "食堂", "餐饮"
+            );
+            buildingsGroup.add(canteen);
+            
+            // 西南七宿舍
+            const dorm7 = createBuilding(
+                -30, -30, 30, 15, 40, 0xD2B48C, "西南七宿舍", "学生宿舍"
+            );
+            buildingsGroup.add(dorm7);
+            
+            // 桥梁馆
+            const bridgeHall = createBuilding(
+                60, 30, 40, 20, 20, 0x4682B4, "桥梁馆", "博物馆"
+            );
+            bridgeHall.name = "桥梁馆";
+            buildingsGroup.add(bridgeHall);
+
+            // 图书馆
+            createLibrary();
+        }
+        
+        // 调用创建同济大学建筑函数
+        createCampus();
+        
+        // 添加鼠标点击事件，显示建筑信息
+        const raycaster = new THREE.Raycaster();
+        const mouse = new THREE.Vector2();
+        
+        function onMouseClick(event) {
+            // 计算鼠标在画布上的归一化坐标
+            mouse.x = (event.clientX / window.innerWidth) * 2 - 1;
+            mouse.y = -(event.clientY / window.innerHeight) * 2 + 1;
+            
+            // 更新射线方向
+            raycaster.setFromCamera(mouse, camera);
+            
+            // 计算物体和射线的交点
+            const intersects = raycaster.intersectObjects(buildingsGroup.children);
+            
+            if (intersects.length > 0) {
+                const selectedObject = intersects[0].object;
+                
+                // 查找选中建筑的数据
+                const buildingData = buildingsData.find(b => b.mesh === selectedObject);
+                if (buildingData) {
+                    document.getElementById('buildingName').textContent = `名称: ${buildingData.name}`;
+                    document.getElementById('buildingHeight').textContent = `高度: ${buildingData.height} 米`;
+                    document.getElementById('buildingFunction').textContent = `功能: ${buildingData.function}`;
+                    document.getElementById('buildingInfo').style.display = 'block';
+                }
+            }
+        }
+        
+        window.addEventListener('click', onMouseClick, false);
+        
+        // 关闭建筑信息按钮
+        document.getElementById('closeInfo').addEventListener('click', function() {
+            document.getElementById('buildingInfo').style.display = 'none';
+        });
+        
+        // 同济大学视角按钮
+        document.getElementById('viewCampus').addEventListener('click', function() {
+            // 同济大学校园全景
+            camera.position.set(100, 100, 100);
+            camera.lookAt(0, 0, 0);
+            controls.target.set(0, 0, 0);
+        });
+        
+        // 夜间模式切换
+        let isNightMode = false;
+        document.getElementById('nightMode').addEventListener('click', function() {
+            isNightMode = !isNightMode;
+            
+            if (isNightMode) {
+                scene.background = new THREE.Color(0x0a0a2a); // 深蓝色夜空
+                ambientLight.intensity = 0.2;
+                directionalLight.intensity = 0.3;
+                
+                // 添加建筑物发光效果
+                buildingsGroup.children.forEach(building => {
+                    const color = new THREE.Color(0xffff99);
+                    color.r += Math.random() * 0.1;
+                    color.g += Math.random() * 0.1;
+                    color.b += Math.random() * 0.1;
+                    
+                    if (building.material) {
+                        building.material.emissive = color;
+                        building.material.emissiveIntensity = 0.3;
+                    }
+                });
+            } else {
+                scene.background = new THREE.Color(0x87CEEB); // 白天天空色
+                ambientLight.intensity = 0.5;
+                directionalLight.intensity = 0.8;
+                
+                // 移除发光效果
+                buildingsGroup.children.forEach(building => {
+                    if (building.material) {
+                        building.material.emissive = new THREE.Color(0x000000);
+                        building.material.emissiveIntensity = 0;
+                    }
+                });
+            }
+        });
+        
+        // 窗口大小调整处理
+        window.addEventListener('resize', () => {
+            camera.aspect = window.innerWidth / window.innerHeight;
+            camera.updateProjectionMatrix();
+            renderer.setSize(window.innerWidth, window.innerHeight);
+        });
+        
+        // 动画循环
+        function animate() {
+            requestAnimationFrame(animate);
+            controls.update();
+            renderer.render(scene, camera);
+        }
+        
+        animate();
+    </script>
+</body>
+</html>
