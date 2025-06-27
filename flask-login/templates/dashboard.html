@@ -1,0 +1,215 @@
+<!DOCTYPE html>
+<html lang="zh-cn">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>控制面板</title>
+    <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/5.15.4/css/all.min.css">
+</head>
+<body>
+    <div class="dashboard-container">
+        <div class="header">
+            <div class="username">
+                <i class="fas fa-user-circle"></i> 欢迎, {{ username }}
+            </div>
+            <a href="{{ url_for('logout') }}" class="btn btn-primary">
+                <i class="fas fa-sign-out-alt"></i> 退出登录
+            </a>
+        </div>
+
+        <!-- 判断是否有紧急未完成事项 -->
+        {% set urgent_todos = todos | selectattr('is_urgent', 'equalto', True) | selectattr('is_done', 'equalto', False) | list %}
+
+        {# 有紧急事项时，待办事项模块在天气模块前 #}
+        {% if urgent_todos|length > 0 %}
+            <div class="dashboard-module todo">
+                <h3><i class="fas fa-tasks" style="color: #ec407a;"></i> 待办事项</h3>
+                <ul class="todo-list">
+                    {% set active_todos = todos | selectattr('is_done', 'equalto', False) | list %}
+                    {% if active_todos|length == 0 %}
+                        <li>无待办事项</li>
+                    {% else %}
+                        {% for item in active_todos %}
+                            <li class="{% if item.is_urgent %}urgent{% endif %}">
+                                <a href="{{ url_for('todo') }}">
+                                    <i class="fas fa-{% if item.is_urgent %}exclamation-circle{% else %}circle{% endif %}"></i>
+                                    {{ item.content }}（截止：{{ item.deadline }}）
+                                    {% if item.is_urgent %}<span class="urgent-badge">【紧急】</span>{% endif %}
+                                </a>
+                            </li>
+                        {% endfor %}
+                    {% endif %}
+                </ul>
+                <div>
+                    <a href="{{ url_for('todo') }}" class="btn btn-outline-primary">
+                        <i class="fas fa-edit"></i> 管理待办事项
+                    </a>
+                </div>
+            </div>
+        {% endif %}
+
+        <div class="dashboard-module weather">
+            <h3><i class="fas fa-cloud-sun" style="color: #4fc3f7;"></i> 当前天气</h3>
+            <p>{{ weather }}</p>
+        </div>
+        
+        <div class="dashboard-module balance">
+            <h3><i class="fas fa-wallet" style="color: #66bb6a;"></i> 校园卡余额</h3>
+            <div id="balance-container">
+                <p><span class="loading-spinner"></span> 加载中...</p>
+            </div>
+        </div>
+        
+        <div class="dashboard-module schedule">
+            <h3><i class="fas fa-calendar-alt" style="color: #ffa726;"></i> 课程安排</h3>
+            {% if next_course %}
+                <div class="alert-info">
+                    <h4>下一节课</h4>
+                    <p><i class="fas fa-book"></i> 课程名称: {{ next_course[0] }}</p>
+                    <p><i class="fas fa-map-marker-alt"></i> 上课地点: {{ next_course[1] }}</p>
+                    <p><i class="fas fa-clock"></i> 时间: {{ next_course[2] }} - {{ next_course[3] }}</p>
+                </div>
+            {% else %}
+                <div class="alert-success">
+                    <i class="fas fa-check-circle"></i> 今天已经没有课啦！
+                </div>
+            {% endif %}
+            <h4>当天剩余课程:</h4>
+            <ul class="course-list">
+                {% for course in courses %}
+                    <li>
+                        <i class="fas fa-book-open"></i> {{ course[0] }} 
+                        <span class="course-time">({{ course[2] }} - {{ course[3] }})</span> - {{ course[1] }}
+                    </li>
+                {% endfor %}
+            </ul>
+            <div class="text-center mt-4">
+                <a href="{{ url_for('add_schedule') }}" class="btn btn-primary">
+                    <i class="fas fa-plus"></i> 添加课程
+                </a>
+            </div>
+        </div>
+        
+        {# 没有紧急事项时，待办事项模块在最后 #}
+        {% if urgent_todos|length == 0 %}
+            <div class="dashboard-module todo">
+                <h3><i class="fas fa-tasks" style="color: #ec407a;"></i> 待办事项</h3>
+                <ul class="todo-list">
+                    {% set active_todos = todos | selectattr('is_done', 'equalto', False) | list %}
+                    {% if active_todos|length == 0 %}
+                        <li>无待办事项</li>
+                    {% else %}
+                        {% for item in active_todos %}
+                            <li class="{% if item.is_urgent %}urgent{% endif %}">
+                                <a href="{{ url_for('todo') }}">
+                                    <i class="fas fa-{% if item.is_urgent %}exclamation-circle{% else %}circle{% endif %}"></i>
+                                    {{ item.content }}（截止：{{ item.deadline }}）
+                                    {% if item.is_urgent %}<span class="urgent-badge">【紧急】</span>{% endif %}
+                                </a>
+                            </li>
+                        {% endfor %}
+                    {% endif %}
+                </ul>
+                <div>
+                    <a href="{{ url_for('todo') }}" class="btn btn-outline-primary">
+                        <i class="fas fa-edit"></i> 管理待办事项
+                    </a>
+                </div>
+            </div>
+        {% endif %}
+    </div>
+
+    <!-- 下拉刷新指示器 -->
+    <div id="refresh-indicator" style="display: none;">
+        <div class="loading-spinner"></div>
+        <p>正在刷新...</p>
+    </div>
+    <script>
+        // 下拉刷新功能
+        let startY;
+        const refreshIndicator = document.getElementById('refresh-indicator');
+        
+        document.addEventListener('touchstart', e => {
+            startY = e.touches[0].clientY;
+        }, {passive: true});
+        
+        document.addEventListener('touchmove', e => {
+            const y = e.touches[0].clientY;
+            const scrollTop = document.documentElement.scrollTop || document.body.scrollTop;
+            
+            if (scrollTop === 0 && y - startY > 50) {
+                refreshIndicator.style.display = 'block';
+                setTimeout(() => {
+                    location.reload();
+                }, 1000);
+            }
+        }, {passive: true});
+
+        // 余额检查功能
+        function checkBalanceStatus() {
+            fetch("{{ url_for('check_balance_status') }}")
+                .then(response => response.json())
+                .then(data => {
+                    const balanceContainer = document.getElementById("balance-container");
+
+                    if (data.status === "need_captcha") {
+                        const existingCaptchaInput = document.getElementById("captcha");
+                        let currentCaptchaValue = "";
+                        
+                        if (existingCaptchaInput) {
+                            currentCaptchaValue = existingCaptchaInput.value;
+                        }
+
+                        balanceContainer.innerHTML = `
+                            <form method="POST" action="{{ url_for('dashboard') }}" class="captcha-form">
+                                <div class="form-group">
+                                    <label for="captcha">短信验证码</label>
+                                    <input type="text" id="captcha" name="captcha" 
+                                           placeholder="请输入6位验证码" required maxlength="6" value="${currentCaptchaValue}">
+                                </div>
+                                <button type="submit" class="btn btn-primary">
+                                    <i class="fas fa-check"></i> 提交验证码
+                                </button>
+                            </form>
+                        `;
+                    } else if (data.status === "success") {
+                        balanceContainer.innerHTML = `
+                            <p class="balance-amount">
+                                <i class="fas fa-yen-sign"></i> ${data.balance}
+                            </p>
+                        `;
+                    } else {
+                        balanceContainer.innerHTML = `
+                            <p><span class="loading-spinner"></span> 加载中...</p>
+                        `;
+                    }
+                })
+                .catch(error => {
+                    console.error("Error fetching balance status:", error);
+                    balanceContainer.innerHTML = `
+                        <p class="error-msg">
+                            <i class="fas fa-exclamation-triangle"></i> 加载失败，请重试
+                        </p>
+                    `;
+                });
+        }
+
+        // 每隔5秒检查一次余额状态
+        setInterval(checkBalanceStatus, 5000);
+        checkBalanceStatus();
+
+        // 添加点击动画效果
+        document.querySelectorAll('.dashboard-module').forEach(module => {
+            module.addEventListener('click', function(e) {
+                if (e.target.tagName !== 'A' && e.target.tagName !== 'BUTTON') {
+                    this.style.transform = 'scale(0.98)';
+                    setTimeout(() => {
+                        this.style.transform = '';
+                    }, 200);
+                }
+            });
+        });
+    </script>
+</body>
+</html>

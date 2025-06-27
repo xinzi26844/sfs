@@ -1,0 +1,101 @@
+<!DOCTYPE html>
+<html lang="zh-cn">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Flask-Login 用户操作流程图</title>
+    <script src="https://cdn.jsdelivr.net/npm/mermaid@11.6.0/dist/mermaid.min.js"></script>
+    <style>
+        body { font-family: Arial, sans-serif; margin: 20px; }
+        .flow-diagram { margin: 20px 0; padding: 15px; border: 1px solid #ddd; border-radius: 5px; }
+        h1, h2 { color: #333; text-align: center; }
+        .mermaid { 
+            margin: 0 auto; 
+            width: 1500px;
+            font-size: 16px;
+        }
+        .node rect, .node circle, .node polygon {
+            font-size: 16px;
+        }
+    </style>
+</head>
+<body>
+    <h1>Flask-Login 用户操作流程图</h1>
+    
+    <div class="flow-diagram">
+        <div class="mermaid">
+            flowchart TD
+                %% 登录流程
+                A([开始]) --> B[输入用户名密码]
+                B --> C{验证通过?}
+                C -->|是| D[进入Dashboard]
+                C -->|否| E[显示错误信息]
+                E --> B
+
+                %% Dashboard主流程
+                D --> F[初始化Dashboard]
+                F --> G[获取天气数据]
+                G --> H{获取成功?}
+                H -->|是| I[显示天气信息]
+                H -->|否| J[显示错误信息]
+
+                F --> K[检查余额缓存]
+                K --> L{缓存有效?}
+                L -->|是| M[显示缓存余额]
+                L -->|否| N[创建后台线程]
+                N --> O1[启动Selenium]
+                O1 --> O2[访问校园卡系统]
+                O2 --> O3{需要验证码?}
+                O3 -->|是| O4[等待用户输入验证码]
+                O4 --> O5[用户提交验证码]
+                O5 --> O6[后台线程重新获取余额]
+                O6 --> O3
+                O3 -->|否| O7[查询余额]
+                O7 --> O8[解析结果]
+                O8 --> R[获取最新余额]
+                R --> S[更新缓存]
+                S --> T[前端轮询获取结果]
+                T --> U{结果就绪?}
+                U -->|是| V[显示最新余额]
+                U -->|否| W[继续等待]
+                W --> T
+
+                F --> X[加载课程表]
+                X --> Y[显示当天课程]
+
+                %% 课表管理功能
+                D --> Z[用户操作区]
+                Z --> AA[添加课程]
+                AA --> AB{表单验证通过?}
+                AB -->|是| AC[保存到数据库]
+                AB -->|否| AD[显示错误提示]
+                AC --> AE[刷新显示]
+
+                Z --> AF[修改课程]
+                AF --> AG{修改有效?}
+                AG -->|是| AH[更新数据库]
+                AG -->|否| AI[显示错误提示]
+                AH --> AJ[刷新显示]
+
+                Z --> AK[删除课程]
+                AK --> AL{确认删除?}
+                AL -->|是| AM[从数据库删除]
+                AL -->|否| AN[取消操作]
+                AM --> AO[刷新显示]
+        </div>
+    </div>
+
+    <script>
+        mermaid.initialize({
+            startOnLoad: true,
+            theme: 'default',
+            flowchart: { 
+                useMaxWidth: true,
+                htmlLabels: true,
+                curve: 'basis',
+                rankSpacing: 50
+            }
+        });
+    </script>
+</body>
+</html>

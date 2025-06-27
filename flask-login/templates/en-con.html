@@ -1,0 +1,256 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>安全登录系统 | 天气仪表盘 | 建筑能耗查询</title>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <style>
+        /* 添加建筑能耗查询相关的样式 */
+        .energy-dashboard {
+            display: none;
+            padding: 20px;
+            background: rgba(255, 255, 255, 0.9);
+            border-radius: 20px;
+            margin-top: 30px;
+            box-shadow: 0 8px 25px rgba(0, 0, 0, 0.1);
+        }
+
+        .energy-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 25px;
+        }
+
+        .energy-header h2 {
+            font-size: 24px;
+            font-weight: 700;
+            color: #333;
+        }
+
+        .energy-table {
+            width: 100%;
+            border-collapse: collapse;
+            margin-top: 20px;
+        }
+
+        .energy-table th, .energy-table td {
+            padding: 12px;
+            text-align: center;
+            border: 1px solid #ddd;
+        }
+
+        .energy-table th {
+            background: #f8f9fa;
+        }
+
+        .energy-table tr:hover {
+            background-color: #f1f1f1;
+        }
+
+        .energy-btn {
+            padding: 10px 20px;
+            background: #1a2a6c;
+            color: white;
+            border: none;
+            border-radius: 50px;
+            font-weight: 600;
+            cursor: pointer;
+            transition: background 0.3s;
+        }
+
+        .energy-btn:hover {
+            background: #b21f1f;
+        }
+
+        /* 分页按钮 */
+        .pagination {
+            display: flex;
+            justify-content: center;
+            margin-top: 20px;
+        }
+
+        .pagination button {
+            padding: 10px 20px;
+            border: none;
+            background: #1a2a6c;
+            color: white;
+            cursor: pointer;
+            font-weight: 600;
+            margin: 0 5px;
+        }
+
+        .pagination button:hover {
+            background: #b21f1f;
+        }
+    </style>
+</head>
+<body>
+    <!-- 登录页面 -->
+    <div class="login-container" id="login-container">
+        <!-- 登录页面内容 -->
+    </div>
+
+    <!-- 仪表盘页面 -->
+    <div class="dashboard" id="dashboard">
+        <div class="header">
+            <div class="logo">
+                <i class="fas fa-cloud-sun"></i>
+                <h1>天气信息仪表盘</h1>
+            </div>
+            
+            <div class="user-info">
+                <img src="https://randomuser.me/api/portraits/men/32.jpg" alt="用户头像" id="user-avatar">
+                <div class="user-details">
+                    <span class="user-name" id="dashboard-username">John</span>
+                    <span class="user-status"><i class="fas fa-circle"></i> 在线</span>
+                </div>
+                <button class="logout-btn" id="dashboard-logout">登出</button>
+            </div>
+        </div>
+
+        <!-- 建筑能耗查询部分 -->
+        <div class="energy-dashboard" id="energy-dashboard">
+            <div class="energy-header">
+                <h2>建筑能耗查询</h2>
+                <button class="energy-btn" id="fetch-energy-data">查询建筑能耗</button>
+            </div>
+
+            <!-- 能耗数据表格 -->
+            <div id="energy-table-container">
+                <!-- 能耗数据将动态生成在这里 -->
+            </div>
+
+            <!-- 分页按钮 -->
+            <div class="pagination" id="pagination-container">
+                <!-- 分页按钮将在这里动态生成 -->
+            </div>
+        </div>
+
+        <div class="footer">
+            <p>数据来源: OpenWeatherMap | 最后更新: <span id="last-update">2023-11-15 14:30:45</span></p>
+            <p>© 2023 天气信息仪表盘 | 基于OpenWeather API开发</p>
+        </div>
+    </div>
+
+    <script>
+        // 模拟建筑能耗数据
+        const mockEnergyData = [
+            { BuildingName: "教学楼", EnergyConsumed: 150, Date: "2023-06-08" },
+            { BuildingName: "图书馆", EnergyConsumed: 200, Date: "2023-06-08" },
+            { BuildingName: "实验楼", EnergyConsumed: 180, Date: "2023-06-08" },
+            { BuildingName: "体育馆", EnergyConsumed: 220, Date: "2023-06-08" },
+            { BuildingName: "行政楼", EnergyConsumed: 210, Date: "2023-06-08" },
+            { BuildingName: "食堂", EnergyConsumed: 190, Date: "2023-06-08" },
+            { BuildingName: "宿舍楼", EnergyConsumed: 160, Date: "2023-06-08" },
+            { BuildingName: "研究中心", EnergyConsumed: 250, Date: "2023-06-08" },
+            { BuildingName: "健身房", EnergyConsumed: 170, Date: "2023-06-08" },
+            { BuildingName: "会议中心", EnergyConsumed: 210, Date: "2023-06-08" }
+        ];
+
+        // 分页相关变量
+        const itemsPerPage = 3;
+        let currentPage = 1;
+
+        // 获取能耗数据并展示
+        function fetchEnergyConsumption() {
+            // 在这里，可以进行API调用获取真实数据。
+            // 目前我们使用mock数据来模拟能耗查询
+
+            const paginatedData = paginateData(mockEnergyData, currentPage);
+            updateEnergyTable(paginatedData);
+            updatePagination(mockEnergyData.length, currentPage);
+        }
+
+        // 分页函数
+        function paginateData(data, page) {
+            const start = (page - 1) * itemsPerPage;
+            const end = start + itemsPerPage;
+            return data.slice(start, end);
+        }
+
+        // 更新能耗数据表格
+        function updateEnergyTable(energyData) {
+            const tableContainer = document.getElementById('energy-table-container');
+            tableContainer.innerHTML = '';  // 清空现有表格内容
+
+            // 创建表格
+            const table = document.createElement('table');
+            table.classList.add('energy-table');
+            
+            // 创建表头
+            const tableHeader = document.createElement('thead');
+            tableHeader.innerHTML = `
+                <tr>
+                    <th>建筑名称</th>
+                    <th>能耗（kWh）</th>
+                    <th>日期</th>
+                </tr>
+            `;
+            table.appendChild(tableHeader);
+
+            // 创建表格内容
+            const tableBody = document.createElement('tbody');
+            energyData.forEach(item => {
+                const row = document.createElement('tr');
+                row.innerHTML = `
+                    <td>${item.BuildingName}</td>
+                    <td>${item.EnergyConsumed}</td>
+                    <td>${item.Date}</td>
+                `;
+                tableBody.appendChild(row);
+            });
+
+            table.appendChild(tableBody);
+            tableContainer.appendChild(table);
+        }
+
+        // 更新分页按钮
+        function updatePagination(totalItems, currentPage) {
+            const paginationContainer = document.getElementById('pagination-container');
+            paginationContainer.innerHTML = '';  // 清空现有分页按钮
+
+            const totalPages = Math.ceil(totalItems / itemsPerPage);
+
+            // 创建上一页按钮
+            if (currentPage > 1) {
+                const prevButton = document.createElement('button');
+                prevButton.textContent = '上一页';
+                prevButton.addEventListener('click', () => changePage(currentPage - 1));
+                paginationContainer.appendChild(prevButton);
+            }
+
+            // 创建当前页按钮
+            const currentPageButton = document.createElement('button');
+            currentPageButton.textContent = `第 ${currentPage} 页`;
+            paginationContainer.appendChild(currentPageButton);
+
+            // 创建下一页按钮
+            if (currentPage < totalPages) {
+                const nextButton = document.createElement('button');
+                nextButton.textContent = '下一页';
+                nextButton.addEventListener('click', () => changePage(currentPage + 1));
+                paginationContainer.appendChild(nextButton);
+            }
+        }
+
+        // 翻页操作
+        function changePage(page) {
+            currentPage = page;
+            fetchEnergyConsumption();
+        }
+
+        // 绑定能耗查询按钮
+        document.getElementById('fetch-energy-data').addEventListener('click', function() {
+            fetchEnergyConsumption();
+        });
+
+        // 页面加载后初始化
+        window.addEventListener('load', function() {
+            // 显示能耗查询部分
+            document.getElementById('energy-dashboard').style.display = 'block'; 
+        });
+    </script>
+</body>
+</html>
